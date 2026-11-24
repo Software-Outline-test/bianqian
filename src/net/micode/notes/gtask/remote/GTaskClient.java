@@ -23,6 +23,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import net.micode.notes.gtask.data.Node;
 import net.micode.notes.gtask.data.Task;
@@ -268,8 +269,7 @@ public class GTaskClient {
             JSONObject js = new JSONObject(jsString);
             mClientVersion = js.getLong("v");
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             return false;
         } catch (Exception e) {
             // simply catch all exceptions
@@ -342,20 +342,16 @@ public class GTaskClient {
             return new JSONObject(jsString);
 
         } catch (ClientProtocolException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new NetworkFailureException("postRequest failed");
         } catch (IOException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new NetworkFailureException("postRequest failed");
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("unable to convert response content to jsonobject");
         } catch (Exception e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("error occurs when posting request");
         }
     }
@@ -380,8 +376,7 @@ public class GTaskClient {
             task.setGid(jsResult.getString(GTaskStringUtils.GTASK_JSON_NEW_ID));
 
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("create task: handing jsonobject failed");
         }
     }
@@ -406,8 +401,7 @@ public class GTaskClient {
             tasklist.setGid(jsResult.getString(GTaskStringUtils.GTASK_JSON_NEW_ID));
 
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("create tasklist: handing jsonobject failed");
         }
     }
@@ -426,8 +420,7 @@ public class GTaskClient {
                 postRequest(jsPost);
                 mUpdateArray = null;
             } catch (JSONException e) {
-                Log.e(TAG, e.toString());
-                e.printStackTrace();
+                SafeLog.error(TAG, "Operation failed", e);
                 throw new ActionFailureException("commit update: handing jsonobject failed");
             }
         }
@@ -480,8 +473,7 @@ public class GTaskClient {
             postRequest(jsPost);
 
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("move task: handing jsonobject failed");
         }
     }
@@ -503,8 +495,7 @@ public class GTaskClient {
             postRequest(jsPost);
             mUpdateArray = null;
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("delete node: handing jsonobject failed");
         }
     }
@@ -533,16 +524,13 @@ public class GTaskClient {
             JSONObject js = new JSONObject(jsString);
             return js.getJSONObject("t").getJSONArray(GTaskStringUtils.GTASK_JSON_LISTS);
         } catch (ClientProtocolException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new NetworkFailureException("gettasklists: httpget failed");
         } catch (IOException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new NetworkFailureException("gettasklists: httpget failed");
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("get task lists: handing jasonobject failed");
         }
     }
@@ -569,8 +557,7 @@ public class GTaskClient {
             JSONObject jsResponse = postRequest(jsPost);
             return jsResponse.getJSONArray(GTaskStringUtils.GTASK_JSON_TASKS);
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("get task list: handing jsonobject failed");
         }
     }

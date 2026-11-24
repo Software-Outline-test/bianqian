@@ -19,20 +19,27 @@ package net.micode.notes.data;
 
 import android.app.SearchManager;
 import android.content.ContentProvider;
+import android.content.ContentProviderOperation;
+import android.content.ContentProviderResult;
 import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Intent;
+import android.content.OperationApplicationException;
 import android.content.UriMatcher;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
+import android.os.RemoteException;
 import android.text.TextUtils;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import net.micode.notes.R;
 import net.micode.notes.data.Notes.DataColumns;
 import net.micode.notes.data.Notes.NoteColumns;
 import net.micode.notes.data.NotesDatabaseHelper.TABLE;
+
+import java.util.ArrayList;
 
 
 public class NotesProvider extends ContentProvider {
@@ -75,7 +82,7 @@ public class NotesProvider extends ContentProvider {
 
     private static String NOTES_SNIPPET_SEARCH_QUERY = "SELECT " + NOTES_SEARCH_PROJECTION
         + " FROM " + TABLE.NOTE
-        + " WHERE " + NoteColumns.SNIPPET + " LIKE ?"
+        + " WHERE " + NoteColumns.SNIPPET + " LIKE ? ESCAPE '\\'"
         + " AND " + NoteColumns.PARENT_ID + "<>" + Notes.ID_TRASH_FOLER
         + " AND " + NoteColumns.TYPE + "=" + Notes.TYPE_NOTE;
 
@@ -83,6 +90,20 @@ public class NotesProvider extends ContentProvider {
     public boolean onCreate() {
         mHelper = NotesDatabaseHelper.getInstance(getContext());
         return true;
+    }
+
+    @Override
+    public ContentProviderResult[] applyBatch(ArrayList<ContentProviderOperation> operations)
+            throws OperationApplicationException {
+        SQLiteDatabase db = mHelper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ContentProviderResult[] results = super.applyBatch(operations);
+            db.setTransactionSuccessful();
+            return results;
+        } finally {
+            db.endTransaction();
+        }
     }
 
     @Override
@@ -131,11 +152,12 @@ public class NotesProvider extends ContentProvider {
                 }
 
                 try {
-                    searchString = String.format("%%%s%%", searchString);
+                    searchString = "%" + searchString.replace("\\", "\\\\")
+                            .replace("%", "\\%").replace("_", "\\_") + "%";
                     c = db.rawQuery(NOTES_SNIPPET_SEARCH_QUERY,
                             new String[] { searchString });
                 } catch (IllegalStateException ex) {
-                    Log.e(TAG, "got exception: " + ex.toString());
+                    SafeLog.error(TAG, "Search failed", ex);
                 }
                 break;
             default:
@@ -159,12 +181,15 @@ public class NotesProvider extends ContentProvider {
                 if (values.containsKey(DataColumns.NOTE_ID)) {
                     noteId = values.getAsLong(DataColumns.NOTE_ID);
                 } else {
-                    Log.d(TAG, "Wrong data format without note id:" + values.toString());
+                    Log.d(TAG, "Wrong data format without note id");
                 }
                 insertedId = dataId = db.insert(TABLE.DATA, null, values);
                 break;
             default:
                 throw new IllegalArgumentException("Unknown URI " + uri);
+        }
+        if (insertedId <= 0) {
+            return null;
         }
         // Notify the note uri
         if (noteId > 0) {
@@ -189,7 +214,7 @@ public class NotesProvider extends ContentProvider {
         boolean deleteData = false;
         switch (mMatcher.match(uri)) {
             case URI_NOTE:
-                selection = "(" + selection + ") AND " + NoteColumns.ID + ">0 ";
+                selection = NoteColumns.ID + ">0" + parseSelection(selection);
                 count = db.delete(TABLE.NOTE, selection, selectionArgs);
                 break;
             case URI_NOTE_ITEM:
@@ -235,13 +260,11 @@ public class NotesProvider extends ContentProvider {
         boolean updateData = false;
         switch (mMatcher.match(uri)) {
             case URI_NOTE:
-                increaseNoteVersion(-1, selection, selectionArgs);
-                count = db.update(TABLE.NOTE, values, selection, selectionArgs);
+                count = updateNotes(db, values, selection, selectionArgs);
                 break;
             case URI_NOTE_ITEM:
                 id = uri.getPathSegments().get(1);
-                increaseNoteVersion(Long.valueOf(id), selection, selectionArgs);
-                count = db.update(TABLE.NOTE, values, NoteColumns.ID + "=" + id
+                count = updateNotes(db, values, NoteColumns.ID + "=" + id
                         + parseSelection(selection), selectionArgs);
                 break;
             case URI_DATA:
@@ -271,29 +294,33 @@ public class NotesProvider extends ContentProvider {
         return (!TextUtils.isEmpty(selection) ? " AND (" + selection + ')' : "");
     }
 
-    private void increaseNoteVersion(long id, String selection, String[] selectionArgs) {
-        StringBuilder sql = new StringBuilder(120);
-        sql.append("UPDATE ");
-        sql.append(TABLE.NOTE);
-        sql.append(" SET ");
-        sql.append(NoteColumns.VERSION);
-        sql.append("=" + NoteColumns.VERSION + "+1 ");
-
-        if (id > 0 || !TextUtils.isEmpty(selection)) {
-            sql.append(" WHERE ");
-        }
-        if (id > 0) {
-            sql.append(NoteColumns.ID + "=" + String.valueOf(id));
-        }
-        if (!TextUtils.isEmpty(selection)) {
-            String selectString = id > 0 ? parseSelection(selection) : selection;
-            for (String args : selectionArgs) {
-                selectString = selectString.replaceFirst("\\?", args);
+    private int updateNotes(SQLiteDatabase db, ContentValues values, String selection,
+            String[] selectionArgs) {
+        ArrayList<Long> ids = new ArrayList<Long>();
+        db.beginTransaction();
+        try {
+            Cursor cursor = db.query(TABLE.NOTE, new String[] { NoteColumns.ID }, selection,
+                    selectionArgs, null, null, null);
+            try {
+                while (cursor.moveToNext()) {
+                    ids.add(cursor.getLong(0));
+                }
+            } finally {
+                cursor.close();
             }
-            sql.append(selectString);
+            int count = db.update(TABLE.NOTE, values, selection, selectionArgs);
+            if (count > 0) {
+                for (Long noteId : ids) {
+                    db.execSQL("UPDATE " + TABLE.NOTE + " SET " + NoteColumns.VERSION + "="
+                            + NoteColumns.VERSION + "+1 WHERE " + NoteColumns.ID + "=?",
+                            new Object[] { noteId });
+                }
+            }
+            db.setTransactionSuccessful();
+            return count;
+        } finally {
+            db.endTransaction();
         }
-
-        mHelper.getWritableDatabase().execSQL(sql.toString());
     }
 
     @Override

@@ -23,6 +23,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.DataColumns;
@@ -352,8 +353,7 @@ public class SqlNote {
                 }
             }
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             return false;
         }
         return true;
@@ -401,8 +401,7 @@ public class SqlNote {
 
             return js;
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
         }
         return null;
     }
@@ -450,7 +449,7 @@ public class SqlNote {
             try {
                 mId = Long.valueOf(uri.getPathSegments().get(1));
             } catch (NumberFormatException e) {
-                Log.e(TAG, "Get note id error :" + e.toString());
+                SafeLog.error(TAG, "Operation failed", e);
                 throw new ActionFailureException("create note failed");
             }
             if (mId == 0) {

@@ -81,7 +81,12 @@ public class NotesPreferenceActivity extends PreferenceActivity {
         mReceiver = new GTaskReceiver();
         IntentFilter filter = new IntentFilter();
         filter.addAction(GTaskSyncService.GTASK_SERVICE_BROADCAST_NAME);
-        registerReceiver(mReceiver, filter);
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(mReceiver, filter, GTaskSyncService.SYNC_STATUS_PERMISSION,
+                    null, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(mReceiver, filter, GTaskSyncService.SYNC_STATUS_PERMISSION, null);
+        }
 
         mOriAccounts = null;
         View header = LayoutInflater.from(this).inflate(R.layout.settings_header, null);
@@ -364,11 +369,18 @@ public class NotesPreferenceActivity extends PreferenceActivity {
 
         @Override
         public void onReceive(Context context, Intent intent) {
+            if (intent == null || !GTaskSyncService.GTASK_SERVICE_BROADCAST_NAME
+                    .equals(intent.getAction()) || !getPackageName().equals(intent.getPackage())) {
+                return;
+            }
             refreshUI();
             if (intent.getBooleanExtra(GTaskSyncService.GTASK_SERVICE_BROADCAST_IS_SYNCING, false)) {
                 TextView syncStatus = (TextView) findViewById(R.id.prefenerece_sync_status_textview);
-                syncStatus.setText(intent
-                        .getStringExtra(GTaskSyncService.GTASK_SERVICE_BROADCAST_PROGRESS_MSG));
+                String progress = intent.getStringExtra(
+                        GTaskSyncService.GTASK_SERVICE_BROADCAST_PROGRESS_MSG);
+                if (progress != null && progress.length() <= 512) {
+                    syncStatus.setText(progress);
+                }
             }
 
         }

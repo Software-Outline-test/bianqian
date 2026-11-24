@@ -72,7 +72,8 @@
     <string name="alert_message_delete_note">确认要删除該條便籤嗎?</string>
     <string name="alert_message_delete_folder">確認刪除檔夾及所包含的便簽嗎？</string>
     <string name="error_sdcard_unmounted">SD卡被佔用，不能操作</string>
-    <string name="error_sdcard_export">導出TXT時發生錯誤，請檢查SD卡</string>
+    <string name="error_sdcard_export">導出至所選檔案時發生錯誤</string>
+    <string name="exported_to_selected_file">便籤已導出至所選檔案。</string>
     <string name="error_note_not_exist">要查看的便籤不存在</string>
     <string name="error_note_empty_for_clock">不能爲空便籤設置鬧鐘提醒</string>
     <string name="error_note_empty_for_send_to_desktop">不能將空便籤發送到桌面</string>
@@ -116,6 +117,8 @@
 
     <string name="search_label">正在搜索便籤</string>
     <string name="search_hint">搜索便籤</string>
+    <string name="search_no_results">找不到符合的便籤</string>
+    <string name="search_failed">搜尋失敗</string>
     <string name="search_setting_description">便籤中的文字</string>
     <string name="search">便籤</string>
     <string name="datetime_dialog_ok">設置</string>

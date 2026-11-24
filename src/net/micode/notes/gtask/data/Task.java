@@ -19,6 +19,7 @@ package net.micode.notes.gtask.data;
 import android.database.Cursor;
 import android.text.TextUtils;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.DataColumns;
@@ -95,8 +96,7 @@ public class Task extends Node {
             }
 
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("fail to generate task-create jsonobject");
         }
 
@@ -127,8 +127,7 @@ public class Task extends Node {
             js.put(GTaskStringUtils.GTASK_JSON_ENTITY_DELTA, entity);
 
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("fail to generate task-update jsonobject");
         }
 
@@ -168,8 +167,7 @@ public class Task extends Node {
                     setCompleted(js.getBoolean(GTaskStringUtils.GTASK_JSON_COMPLETED));
                 }
             } catch (JSONException e) {
-                Log.e(TAG, e.toString());
-                e.printStackTrace();
+                SafeLog.error(TAG, "Operation failed", e);
                 throw new ActionFailureException("fail to get task content from jsonobject");
             }
         }
@@ -199,8 +197,7 @@ public class Task extends Node {
             }
 
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
         }
     }
 
@@ -241,8 +238,7 @@ public class Task extends Node {
                 return mMetaInfo;
             }
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             return null;
         }
     }
@@ -252,7 +248,7 @@ public class Task extends Node {
             try {
                 mMetaInfo = new JSONObject(metaData.getNotes());
             } catch (JSONException e) {
-                Log.w(TAG, e.toString());
+                SafeLog.error(TAG, "Operation failed", e);
                 mMetaInfo = null;
             }
         }
@@ -304,8 +300,7 @@ public class Task extends Node {
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
         }
 
         return SYNC_ACTION_ERROR;

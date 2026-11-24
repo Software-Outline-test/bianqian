@@ -23,6 +23,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
@@ -146,14 +147,13 @@ public class GTaskManager {
             asyncTask.publishProgess(mContext.getString(R.string.sync_progress_syncing));
             syncContent();
         } catch (NetworkFailureException e) {
-            Log.e(TAG, e.toString());
+            SafeLog.error(TAG, "Operation failed", e);
             return STATE_NETWORK_ERROR;
         } catch (ActionFailureException e) {
-            Log.e(TAG, e.toString());
+            SafeLog.error(TAG, "Operation failed", e);
             return STATE_INTERNAL_ERROR;
         } catch (Exception e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             return STATE_INTERNAL_ERROR;
         } finally {
             mGTaskListHashMap.clear();
@@ -241,8 +241,7 @@ public class GTaskManager {
                 }
             }
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("initGTaskList: handing JSONObject failed");
         }
     }
@@ -571,8 +570,7 @@ public class GTaskManager {
 
                 }
             } catch (JSONException e) {
-                Log.w(TAG, e.toString());
-                e.printStackTrace();
+                SafeLog.error(TAG, "Operation failed", e);
             }
             sqlNote.setContent(js);
 

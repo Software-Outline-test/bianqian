@@ -18,6 +18,7 @@ package net.micode.notes.gtask.data;
 
 import android.database.Cursor;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.NoteColumns;
@@ -66,8 +67,7 @@ public class TaskList extends Node {
             js.put(GTaskStringUtils.GTASK_JSON_ENTITY_DELTA, entity);
 
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("fail to generate tasklist-create jsonobject");
         }
 
@@ -95,8 +95,7 @@ public class TaskList extends Node {
             js.put(GTaskStringUtils.GTASK_JSON_ENTITY_DELTA, entity);
 
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             throw new ActionFailureException("fail to generate tasklist-update jsonobject");
         }
 
@@ -122,8 +121,7 @@ public class TaskList extends Node {
                 }
 
             } catch (JSONException e) {
-                Log.e(TAG, e.toString());
-                e.printStackTrace();
+                SafeLog.error(TAG, "Operation failed", e);
                 throw new ActionFailureException("fail to get tasklist content from jsonobject");
             }
         }
@@ -152,8 +150,7 @@ public class TaskList extends Node {
                 Log.e(TAG, "error type");
             }
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
         }
     }
 
@@ -177,8 +174,7 @@ public class TaskList extends Node {
 
             return js;
         } catch (JSONException e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
             return null;
         }
     }
@@ -209,8 +205,7 @@ public class TaskList extends Node {
                 }
             }
         } catch (Exception e) {
-            Log.e(TAG, e.toString());
-            e.printStackTrace();
+            SafeLog.error(TAG, "Operation failed", e);
         }
 
         return SYNC_ACTION_ERROR;

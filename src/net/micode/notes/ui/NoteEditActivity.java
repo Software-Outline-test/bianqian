@@ -133,6 +133,7 @@ public class NoteEditActivity extends Activity implements OnClickListener,
     private View mNoteEditorPanel;
 
     private WorkingNote mWorkingNote;
+    private String mLastSavedContent;
 
     private SharedPreferences mSharedPrefs;
     private int mFontSizeId;
@@ -266,6 +267,7 @@ public class NoteEditActivity extends Activity implements OnClickListener,
     protected void onResume() {
         super.onResume();
         initNoteScreen();
+        mLastSavedContent = mWorkingNote.getContent();
     }
 
     private void initNoteScreen() {
@@ -372,6 +374,8 @@ public class NoteEditActivity extends Activity implements OnClickListener,
         mNoteHeaderHolder.ibSetBgColor = (ImageView) findViewById(R.id.btn_set_bg_color);
         mNoteHeaderHolder.ibSetBgColor.setOnClickListener(this);
         mNoteEditor = (EditText) findViewById(R.id.note_edit_view);
+        findViewById(R.id.btn_save_note).setOnClickListener(this);
+        findViewById(R.id.btn_exit_note).setOnClickListener(this);
         mNoteEditorPanel = findViewById(R.id.sv_note_edit);
         mNoteBgColorSelector = findViewById(R.id.note_bg_color_selector);
         for (int id : sBgSelectorBtnsMap.keySet()) {
@@ -427,7 +431,11 @@ public class NoteEditActivity extends Activity implements OnClickListener,
 
     public void onClick(View v) {
         int id = v.getId();
-        if (id == R.id.btn_set_bg_color) {
+        if (id == R.id.btn_save_note) {
+            saveNoteOrShowError();
+        } else if (id == R.id.btn_exit_note) {
+            requestExit();
+        } else if (id == R.id.btn_set_bg_color) {
             mNoteBgColorSelector.setVisibility(View.VISIBLE);
             findViewById(sBgSelectorSelectionMap.get(mWorkingNote.getBgColorId())).setVisibility(
                     -                    View.VISIBLE);
@@ -457,9 +465,46 @@ public class NoteEditActivity extends Activity implements OnClickListener,
         if(clearSettingState()) {
             return;
         }
+        requestExit();
+    }
 
-        saveNote();
-        super.onBackPressed();
+    private void requestExit() {
+        getWorkingText();
+        if (mWorkingNote.isBlankNewNote()) {
+            finish();
+            return;
+        }
+        if (TextUtils.equals(mLastSavedContent, mWorkingNote.getContent())) {
+            finish();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setMessage(R.string.note_unsaved_changes)
+                .setPositiveButton(R.string.note_save_and_exit,
+                        new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                if (saveNoteOrShowError()) {
+                                    finish();
+                                }
+                            }
+                        })
+                .setNegativeButton(R.string.note_keep_editing, null)
+                .show();
+    }
+
+    private boolean saveNoteOrShowError() {
+        getWorkingText();
+        if (mWorkingNote.isBlankNewNote()) {
+            return true;
+        }
+        if (TextUtils.equals(mLastSavedContent, mWorkingNote.getContent())) {
+            return true;
+        }
+        if (saveNote()) {
+            return true;
+        }
+        Toast.makeText(this, R.string.note_save_failed, Toast.LENGTH_SHORT).show();
+        return false;
     }
 
     private boolean clearSettingState() {
@@ -711,15 +756,13 @@ public class NoteEditActivity extends Activity implements OnClickListener,
     private Spannable getHighlightQueryResult(String fullText, String userQuery) {
         SpannableString spannable = new SpannableString(fullText == null ? "" : fullText);
         if (!TextUtils.isEmpty(userQuery)) {
-            mPattern = Pattern.compile(userQuery);
-            Matcher m = mPattern.matcher(fullText);
-            int start = 0;
-            while (m.find(start)) {
+            mPattern = Pattern.compile(Pattern.quote(userQuery), Pattern.CASE_INSENSITIVE);
+            Matcher m = mPattern.matcher(spannable);
+            while (m.find()) {
                 spannable.setSpan(
                         new BackgroundColorSpan(this.getResources().getColor(
                                 R.color.user_query_highlight)), m.start(), m.end(),
                         Spannable.SPAN_INCLUSIVE_EXCLUSIVE);
-                start = m.end();
             }
         }
         return spannable;
@@ -809,6 +852,7 @@ public class NoteEditActivity extends Activity implements OnClickListener,
         getWorkingText();
         boolean saved = mWorkingNote.saveNote();
         if (saved) {
+            mLastSavedContent = mWorkingNote.getContent();
             /**
              * There are two modes from List view to edit view, open one note,
              * create/edit a node. Opening node requires to the original

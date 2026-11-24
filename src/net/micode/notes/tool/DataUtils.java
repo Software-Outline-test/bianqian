@@ -25,6 +25,7 @@ import android.content.OperationApplicationException;
 import android.database.Cursor;
 import android.os.RemoteException;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.CallNote;
@@ -65,9 +66,9 @@ public class DataUtils {
             }
             return true;
         } catch (RemoteException e) {
-            Log.e(TAG, String.format("%s: %s", e.toString(), e.getMessage()));
+            SafeLog.error(TAG, "Operation failed", e);
         } catch (OperationApplicationException e) {
-            Log.e(TAG, String.format("%s: %s", e.toString(), e.getMessage()));
+            SafeLog.error(TAG, "Operation failed", e);
         }
         return false;
     }
@@ -104,9 +105,9 @@ public class DataUtils {
             }
             return true;
         } catch (RemoteException e) {
-            Log.e(TAG, String.format("%s: %s", e.toString(), e.getMessage()));
+            SafeLog.error(TAG, "Operation failed", e);
         } catch (OperationApplicationException e) {
-            Log.e(TAG, String.format("%s: %s", e.toString(), e.getMessage()));
+            SafeLog.error(TAG, "Operation failed", e);
         }
         return false;
     }
@@ -127,7 +128,7 @@ public class DataUtils {
                 try {
                     count = cursor.getInt(0);
                 } catch (IndexOutOfBoundsException e) {
-                    Log.e(TAG, "get folder count failed:" + e.toString());
+                    SafeLog.error(TAG, "Operation failed", e);
                 } finally {
                     cursor.close();
                 }
@@ -215,7 +216,7 @@ public class DataUtils {
                         widget.widgetType = c.getInt(1);
                         set.add(widget);
                     } catch (IndexOutOfBoundsException e) {
-                        Log.e(TAG, e.toString());
+                        SafeLog.error(TAG, "Operation failed", e);
                     }
                 } while (c.moveToNext());
             }
@@ -235,7 +236,7 @@ public class DataUtils {
             try {
                 return cursor.getString(0);
             } catch (IndexOutOfBoundsException e) {
-                Log.e(TAG, "Get call number fails " + e.toString());
+                SafeLog.error(TAG, "Operation failed", e);
             } finally {
                 cursor.close();
             }
@@ -256,7 +257,7 @@ public class DataUtils {
                 try {
                     return cursor.getLong(0);
                 } catch (IndexOutOfBoundsException e) {
-                    Log.e(TAG, "Get call note id fails " + e.toString());
+                    SafeLog.error(TAG, "Operation failed", e);
                 }
             }
             cursor.close();

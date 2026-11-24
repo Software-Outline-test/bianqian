@@ -22,6 +22,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
+import android.os.Build;
 import android.util.Log;
 import android.widget.RemoteViews;
 
@@ -44,6 +45,31 @@ public abstract class NoteWidgetProvider extends AppWidgetProvider {
     public static final int COLUMN_SNIPPET      = 2;
 
     private static final String TAG = "NoteWidgetProvider";
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        if (intent == null || intent.getAction() == null) {
+            return;
+        }
+        String action = intent.getAction();
+        if (AppWidgetManager.ACTION_APPWIDGET_UPDATE.equals(action)) {
+            int[] ids = intent.getIntArrayExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS);
+            if (ids == null || ids.length == 0) {
+                return;
+            }
+            for (int id : ids) {
+                if (id < 0) {
+                    return;
+                }
+            }
+        } else if (AppWidgetManager.ACTION_APPWIDGET_DELETED.equals(action)
+                && intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
+                        AppWidgetManager.INVALID_APPWIDGET_ID)
+                        == AppWidgetManager.INVALID_APPWIDGET_ID) {
+            return;
+        }
+        super.onReceive(context, intent);
+    }
 
     @Override
     public void onDeleted(Context context, int[] appWidgetIds) {
@@ -107,15 +133,19 @@ public abstract class NoteWidgetProvider extends AppWidgetProvider {
                  * Generate the pending intent to start host for the widget
                  */
                 PendingIntent pendingIntent = null;
+                int pendingIntentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    pendingIntentFlags |= PendingIntent.FLAG_IMMUTABLE;
+                }
                 if (privacyMode) {
                     rv.setTextViewText(R.id.widget_text,
                             context.getString(R.string.widget_under_visit_mode));
                     pendingIntent = PendingIntent.getActivity(context, appWidgetIds[i], new Intent(
-                            context, NotesListActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
+                            context, NotesListActivity.class), pendingIntentFlags);
                 } else {
                     rv.setTextViewText(R.id.widget_text, snippet);
                     pendingIntent = PendingIntent.getActivity(context, appWidgetIds[i], intent,
-                            PendingIntent.FLAG_UPDATE_CURRENT);
+                            pendingIntentFlags);
                 }
 
                 rv.setOnClickPendingIntent(R.id.widget_text, pendingIntent);

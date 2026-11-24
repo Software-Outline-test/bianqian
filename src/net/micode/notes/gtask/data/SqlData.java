@@ -23,6 +23,7 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.DataColumns;
@@ -156,7 +157,7 @@ public class SqlData {
             try {
                 mDataId = Long.valueOf(uri.getPathSegments().get(1));
             } catch (NumberFormatException e) {
-                Log.e(TAG, "Get note id error :" + e.toString());
+                SafeLog.error(TAG, "Operation failed", e);
                 throw new ActionFailureException("create note failed");
             }
         } else {

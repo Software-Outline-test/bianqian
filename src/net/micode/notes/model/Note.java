@@ -24,6 +24,7 @@ import android.content.OperationApplicationException;
 import android.net.Uri;
 import android.os.RemoteException;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import net.micode.notes.data.Notes;
 import net.micode.notes.data.Notes.CallNote;
@@ -50,19 +51,19 @@ public class Note {
         values.put(NoteColumns.TYPE, Notes.TYPE_NOTE);
         values.put(NoteColumns.LOCAL_MODIFIED, 1);
         values.put(NoteColumns.PARENT_ID, folderId);
-        Uri uri = context.getContentResolver().insert(Notes.CONTENT_NOTE_URI, values);
-
-        long noteId = 0;
         try {
-            noteId = Long.valueOf(uri.getPathSegments().get(1));
-        } catch (NumberFormatException e) {
-            Log.e(TAG, "Get note id error :" + e.toString());
-            noteId = 0;
+            Uri uri = context.getContentResolver().insert(Notes.CONTENT_NOTE_URI, values);
+            if (uri != null) {
+                long noteId = ContentUris.parseId(uri);
+                if (noteId > 0) {
+                    return noteId;
+                }
+            }
+        } catch (RuntimeException e) {
+            SafeLog.error(TAG, "Create note failed", e);
         }
-        if (noteId == -1) {
-            throw new IllegalStateException("Wrong note id:" + noteId);
-        }
-        return noteId;
+        Log.e(TAG, "Could not create note");
+        return 0;
     }
 
     public Note() {
@@ -114,19 +115,23 @@ public class Note {
          * {@link NoteColumns#MODIFIED_DATE}. For data safety, though update note fails, we also update the
          * note data info
          */
-        if (context.getContentResolver().update(
-                ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, noteId), mNoteDiffValues, null,
-                null) == 0) {
-            Log.e(TAG, "Update note error, should not happen");
-            // Do not return, fall through
-        }
-        mNoteDiffValues.clear();
-
-        if (mNoteData.isLocalModified()
-                && (mNoteData.pushIntoContentResolver(context, noteId) == null)) {
+        try {
+            if (context.getContentResolver().update(
+                    ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, noteId), mNoteDiffValues,
+                    null, null) != 1) {
+                Log.e(TAG, "Could not update note");
+                return false;
+            }
+            if (mNoteData.isLocalModified()
+                    && mNoteData.pushIntoContentResolver(context, noteId) == null) {
+                return false;
+            }
+        } catch (RuntimeException e) {
+            SafeLog.error(TAG, "Save failed", e);
             return false;
         }
 
+        mNoteDiffValues.clear();
         return true;
     }
 
@@ -186,66 +191,74 @@ public class Note {
                 throw new IllegalArgumentException("Wrong note id:" + noteId);
             }
 
-            ArrayList<ContentProviderOperation> operationList = new ArrayList<ContentProviderOperation>();
-            ContentProviderOperation.Builder builder = null;
-
-            if(mTextDataValues.size() > 0) {
-                mTextDataValues.put(DataColumns.NOTE_ID, noteId);
+            ArrayList<ContentProviderOperation> operations = new ArrayList<ContentProviderOperation>();
+            int textIndex = -1;
+            int callIndex = -1;
+            if (mTextDataValues.size() > 0) {
+                ContentValues values = new ContentValues(mTextDataValues);
+                values.put(DataColumns.NOTE_ID, noteId);
+                textIndex = operations.size();
                 if (mTextDataId == 0) {
-                    mTextDataValues.put(DataColumns.MIME_TYPE, TextNote.CONTENT_ITEM_TYPE);
-                    Uri uri = context.getContentResolver().insert(Notes.CONTENT_DATA_URI,
-                            mTextDataValues);
-                    try {
-                        setTextDataId(Long.valueOf(uri.getPathSegments().get(1)));
-                    } catch (NumberFormatException e) {
-                        Log.e(TAG, "Insert new text data fail with noteId" + noteId);
-                        mTextDataValues.clear();
-                        return null;
-                    }
+                    values.put(DataColumns.MIME_TYPE, TextNote.CONTENT_ITEM_TYPE);
+                    operations.add(ContentProviderOperation.newInsert(Notes.CONTENT_DATA_URI)
+                            .withValues(values).build());
                 } else {
-                    builder = ContentProviderOperation.newUpdate(ContentUris.withAppendedId(
-                            Notes.CONTENT_DATA_URI, mTextDataId));
-                    builder.withValues(mTextDataValues);
-                    operationList.add(builder.build());
+                    operations.add(ContentProviderOperation.newUpdate(ContentUris.withAppendedId(
+                            Notes.CONTENT_DATA_URI, mTextDataId)).withValues(values)
+                            .withExpectedCount(1).build());
                 }
-                mTextDataValues.clear();
             }
-
-            if(mCallDataValues.size() > 0) {
-                mCallDataValues.put(DataColumns.NOTE_ID, noteId);
+            if (mCallDataValues.size() > 0) {
+                ContentValues values = new ContentValues(mCallDataValues);
+                values.put(DataColumns.NOTE_ID, noteId);
+                callIndex = operations.size();
                 if (mCallDataId == 0) {
-                    mCallDataValues.put(DataColumns.MIME_TYPE, CallNote.CONTENT_ITEM_TYPE);
-                    Uri uri = context.getContentResolver().insert(Notes.CONTENT_DATA_URI,
-                            mCallDataValues);
-                    try {
-                        setCallDataId(Long.valueOf(uri.getPathSegments().get(1)));
-                    } catch (NumberFormatException e) {
-                        Log.e(TAG, "Insert new call data fail with noteId" + noteId);
-                        mCallDataValues.clear();
+                    values.put(DataColumns.MIME_TYPE, CallNote.CONTENT_ITEM_TYPE);
+                    operations.add(ContentProviderOperation.newInsert(Notes.CONTENT_DATA_URI)
+                            .withValues(values).build());
+                } else {
+                    operations.add(ContentProviderOperation.newUpdate(ContentUris.withAppendedId(
+                            Notes.CONTENT_DATA_URI, mCallDataId)).withValues(values)
+                            .withExpectedCount(1).build());
+                }
+            }
+            try {
+                ContentProviderResult[] results = context.getContentResolver().applyBatch(
+                        Notes.AUTHORITY, operations);
+                if (results == null || results.length != operations.size()) {
+                    return null;
+                }
+                if (textIndex >= 0) {
+                    if (results[textIndex] == null || (mTextDataId == 0
+                            ? results[textIndex].uri == null : results[textIndex].count == null
+                            || results[textIndex].count != 1)) {
                         return null;
                     }
-                } else {
-                    builder = ContentProviderOperation.newUpdate(ContentUris.withAppendedId(
-                            Notes.CONTENT_DATA_URI, mCallDataId));
-                    builder.withValues(mCallDataValues);
-                    operationList.add(builder.build());
                 }
-                mCallDataValues.clear();
-            }
-
-            if (operationList.size() > 0) {
-                try {
-                    ContentProviderResult[] results = context.getContentResolver().applyBatch(
-                            Notes.AUTHORITY, operationList);
-                    return (results == null || results.length == 0 || results[0] == null) ? null
-                            : ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, noteId);
-                } catch (RemoteException e) {
-                    Log.e(TAG, String.format("%s: %s", e.toString(), e.getMessage()));
-                    return null;
-                } catch (OperationApplicationException e) {
-                    Log.e(TAG, String.format("%s: %s", e.toString(), e.getMessage()));
-                    return null;
+                if (callIndex >= 0) {
+                    if (results[callIndex] == null || (mCallDataId == 0
+                            ? results[callIndex].uri == null : results[callIndex].count == null
+                            || results[callIndex].count != 1)) {
+                        return null;
+                    }
                 }
+                if (textIndex >= 0) {
+                    if (mTextDataId == 0) {
+                        mTextDataId = ContentUris.parseId(results[textIndex].uri);
+                    }
+                    mTextDataValues.clear();
+                }
+                if (callIndex >= 0) {
+                    if (mCallDataId == 0) {
+                        mCallDataId = ContentUris.parseId(results[callIndex].uri);
+                    }
+                    mCallDataValues.clear();
+                }
+                return ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, noteId);
+            } catch (RemoteException e) {
+                SafeLog.error(TAG, "Could not save note data", e);
+            } catch (OperationApplicationException e) {
+                SafeLog.error(TAG, "Could not save note data", e);
             }
             return null;
         }

@@ -33,6 +33,7 @@ import android.provider.Settings;
 import android.view.Window;
 import android.view.WindowManager;
 
+import net.micode.notes.tool.SafeLog;
 import net.micode.notes.R;
 import net.micode.notes.data.Notes;
 import net.micode.notes.tool.DataUtils;
@@ -41,6 +42,7 @@ import java.io.IOException;
 
 
 public class AlarmAlertActivity extends Activity implements OnClickListener, OnDismissListener {
+    private static final String TAG = "AlarmAlertActivity";
     private long mNoteId;
     private String mSnippet;
     private static final int SNIPPET_PREW_MAX_LEN = 60;
@@ -62,15 +64,25 @@ public class AlarmAlertActivity extends Activity implements OnClickListener, OnD
         }
 
         Intent intent = getIntent();
+        if (intent == null || intent.getData() == null
+                || intent.getData().getPathSegments().size() < 2) {
+            finish();
+            return;
+        }
 
         try {
             mNoteId = Long.valueOf(intent.getData().getPathSegments().get(1));
             mSnippet = DataUtils.getSnippetById(this.getContentResolver(), mNoteId);
+            if (mSnippet == null) {
+                finish();
+                return;
+            }
             mSnippet = mSnippet.length() > SNIPPET_PREW_MAX_LEN ? mSnippet.substring(0,
                     SNIPPET_PREW_MAX_LEN) + getResources().getString(R.string.notelist_string_info)
                     : mSnippet;
         } catch (IllegalArgumentException e) {
-            e.printStackTrace();
+            SafeLog.error(TAG, "Invalid alarm", e);
+            finish();
             return;
         }
 
@@ -90,32 +102,24 @@ public class AlarmAlertActivity extends Activity implements OnClickListener, OnD
 
     private void playAlarmSound() {
         Uri url = RingtoneManager.getActualDefaultRingtoneUri(this, RingtoneManager.TYPE_ALARM);
-
-        int silentModeStreams = Settings.System.getInt(getContentResolver(),
-                Settings.System.MODE_RINGER_STREAMS_AFFECTED, 0);
-
-        if ((silentModeStreams & (1 << AudioManager.STREAM_ALARM)) != 0) {
-            mPlayer.setAudioStreamType(silentModeStreams);
-        } else {
-            mPlayer.setAudioStreamType(AudioManager.STREAM_ALARM);
+        if (url == null) {
+            return;
         }
+
         try {
+            mPlayer.setAudioStreamType(AudioManager.STREAM_ALARM);
             mPlayer.setDataSource(this, url);
             mPlayer.prepare();
             mPlayer.setLooping(true);
             mPlayer.start();
         } catch (IllegalArgumentException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            SafeLog.error(TAG, "Alarm playback failed", e);
         } catch (SecurityException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            SafeLog.error(TAG, "Alarm playback failed", e);
         } catch (IllegalStateException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            SafeLog.error(TAG, "Alarm playback failed", e);
         } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            SafeLog.error(TAG, "Alarm playback failed", e);
         }
     }
 
@@ -150,7 +154,13 @@ public class AlarmAlertActivity extends Activity implements OnClickListener, OnD
 
     private void stopAlarmSound() {
         if (mPlayer != null) {
-            mPlayer.stop();
+            try {
+                if (mPlayer.isPlaying()) {
+                    mPlayer.stop();
+                }
+            } catch (IllegalStateException e) {
+                SafeLog.error(TAG, "Alarm stop failed", e);
+            }
             mPlayer.release();
             mPlayer = null;
         }

@@ -18,7 +18,7 @@ package net.micode.notes.tool;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.os.Environment;
+import android.net.Uri;
 import android.text.TextUtils;
 import android.text.format.DateFormat;
 import android.util.Log;
@@ -29,10 +29,8 @@ import net.micode.notes.data.Notes.DataColumns;
 import net.micode.notes.data.Notes.DataConstants;
 import net.micode.notes.data.Notes.NoteColumns;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.PrintStream;
 
 
@@ -69,20 +67,8 @@ public class BackupUtils {
         mTextExport = new TextExport(context);
     }
 
-    private static boolean externalStorageAvailable() {
-        return Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState());
-    }
-
-    public int exportToText() {
-        return mTextExport.exportToText();
-    }
-
-    public String getExportedTextFileName() {
-        return mTextExport.mFileName;
-    }
-
-    public String getExportedTextFileDir() {
-        return mTextExport.mFileDirectory;
+    public int exportToText(Uri destination) {
+        return mTextExport.exportToText(destination);
     }
 
     private static class TextExport {
@@ -122,14 +108,10 @@ public class BackupUtils {
         private static final int FORMAT_NOTE_CONTENT         = 2;
 
         private Context mContext;
-        private String mFileName;
-        private String mFileDirectory;
 
         public TextExport(Context context) {
             TEXT_FORMAT = context.getResources().getStringArray(R.array.format_for_exported_note);
             mContext = context;
-            mFileName = "";
-            mFileDirectory = "";
         }
 
         private String getFormat(int id) {
@@ -205,30 +187,31 @@ public class BackupUtils {
                 }
                 dataCursor.close();
             }
-            // print a line separator between note
-            try {
-                ps.write(new byte[] {
-                        Character.LINE_SEPARATOR, Character.LETTER_NUMBER
-                });
-            } catch (IOException e) {
-                Log.e(TAG, e.toString());
-            }
+            ps.println();
         }
 
         /**
          * Note will be exported as text which is user readable
          */
-        public int exportToText() {
-            if (!externalStorageAvailable()) {
-                Log.d(TAG, "Media was not mounted");
-                return STATE_SD_CARD_UNMOUONTED;
-            }
-
-            PrintStream ps = getExportToTextPrintStream();
-            if (ps == null) {
-                Log.e(TAG, "get print stream error");
+        public int exportToText(Uri destination) {
+            if (destination == null) {
                 return STATE_SYSTEM_ERROR;
             }
+            try (OutputStream output = mContext.getContentResolver().openOutputStream(destination);
+                    PrintStream ps = output == null ? null : new PrintStream(output, false, "UTF-8")) {
+                if (ps == null) {
+                    return STATE_SYSTEM_ERROR;
+                }
+                writeNotes(ps);
+                ps.flush();
+                return ps.checkError() ? STATE_SYSTEM_ERROR : STATE_SUCCESS;
+            } catch (IOException | RuntimeException e) {
+                Log.e(TAG, "Text export failed: " + e.getClass().getSimpleName());
+                return STATE_SYSTEM_ERROR;
+            }
+        }
+
+        private void writeNotes(PrintStream ps) {
             // First export folder and its notes
             Cursor folderCursor = mContext.getContentResolver().query(
                     Notes.CONTENT_NOTE_URI,
@@ -277,67 +260,7 @@ public class BackupUtils {
                 }
                 noteCursor.close();
             }
-            ps.close();
-
-            return STATE_SUCCESS;
         }
-
-        /**
-         * Get a print stream pointed to the file {@generateExportedTextFile}
-         */
-        private PrintStream getExportToTextPrintStream() {
-            File file = generateFileMountedOnSDcard(mContext, R.string.file_path,
-                    R.string.file_name_txt_format);
-            if (file == null) {
-                Log.e(TAG, "create file to exported failed");
-                return null;
-            }
-            mFileName = file.getName();
-            mFileDirectory = mContext.getString(R.string.file_path);
-            PrintStream ps = null;
-            try {
-                FileOutputStream fos = new FileOutputStream(file);
-                ps = new PrintStream(fos);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                return null;
-            } catch (NullPointerException e) {
-                e.printStackTrace();
-                return null;
-            }
-            return ps;
-        }
-    }
-
-    /**
-     * Generate the text file to store imported data
-     */
-    private static File generateFileMountedOnSDcard(Context context, int filePathResId, int fileNameFormatResId) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(Environment.getExternalStorageDirectory());
-        sb.append(context.getString(filePathResId));
-        File filedir = new File(sb.toString());
-        sb.append(context.getString(
-                fileNameFormatResId,
-                DateFormat.format(context.getString(R.string.format_date_ymd),
-                        System.currentTimeMillis())));
-        File file = new File(sb.toString());
-
-        try {
-            if (!filedir.exists()) {
-                filedir.mkdir();
-            }
-            if (!file.exists()) {
-                file.createNewFile();
-            }
-            return file;
-        } catch (SecurityException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return null;
     }
 }
 

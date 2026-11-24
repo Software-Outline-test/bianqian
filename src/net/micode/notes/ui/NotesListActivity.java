@@ -19,6 +19,7 @@ package net.micode.notes.ui;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.app.SearchManager;
 import android.appwidget.AppWidgetManager;
 import android.content.AsyncQueryHandler;
 import android.content.ContentResolver;
@@ -28,6 +29,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
@@ -35,6 +37,7 @@ import android.text.Editable;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 import android.view.ActionMode;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
@@ -77,6 +80,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.HashSet;
+import java.util.ArrayList;
 
 public class NotesListActivity extends Activity implements OnClickListener, OnItemLongClickListener {
     private static final int FOLDER_NOTE_LIST_QUERY_TOKEN = 0;
@@ -134,6 +138,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     private final static int REQUEST_CODE_OPEN_NODE = 102;
     private final static int REQUEST_CODE_NEW_NODE  = 103;
+    private final static int REQUEST_CODE_EXPORT_TEXT = 104;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -149,7 +154,11 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == RESULT_OK
+        if (requestCode == REQUEST_CODE_EXPORT_TEXT) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                exportNoteToText(data.getData());
+            }
+        } else if (resultCode == RESULT_OK
                 && (requestCode == REQUEST_CODE_OPEN_NODE || requestCode == REQUEST_CODE_NEW_NODE)) {
             mNotesListAdapter.changeCursor(null);
         } else {
@@ -177,7 +186,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
                     return;
                 }
             } catch (IOException e) {
-                e.printStackTrace();
+                SafeLog.error(TAG, "Operation failed", e);
                 return;
             } finally {
                 if(in != null) {
@@ -185,7 +194,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
                         in.close();
                     } catch (IOException e) {
                         // TODO Auto-generated catch block
-                        e.printStackTrace();
+                        SafeLog.error(TAG, "Operation failed", e);
                     }
                 }
             }
@@ -297,13 +306,16 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         }
 
         public void onDestroyActionMode(ActionMode mode) {
+            mActionMode = null;
             mNotesListAdapter.setChoiceMode(false);
             mNotesListView.setLongClickable(true);
             mAddNewNote.setVisibility(View.VISIBLE);
         }
 
         public void finishActionMode() {
-            mActionMode.finish();
+            if (mActionMode != null) {
+                mActionMode.finish();
+            }
         }
 
         public void onItemCheckedStateChanged(ActionMode mode, int position, long id,
@@ -470,25 +482,25 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     }
 
     private void batchDelete() {
+        final HashSet<Long> selectedIds = mNotesListAdapter.getSelectedItemIds();
+        final HashSet<AppWidgetAttribute> selectedWidgets = mNotesListAdapter.getSelectedWidget();
         new AsyncTask<Void, Void, HashSet<AppWidgetAttribute>>() {
             protected HashSet<AppWidgetAttribute> doInBackground(Void... unused) {
-                HashSet<AppWidgetAttribute> widgets = mNotesListAdapter.getSelectedWidget();
                 if (!isSyncMode()) {
                     // if not synced, delete notes directly
-                    if (DataUtils.batchDeleteNotes(mContentResolver, mNotesListAdapter
-                            .getSelectedItemIds())) {
+                    if (DataUtils.batchDeleteNotes(mContentResolver, selectedIds)) {
                     } else {
                         Log.e(TAG, "Delete notes error, should not happens");
                     }
                 } else {
                     // in sync mode, we'll move the deleted note into the trash
                     // folder
-                    if (!DataUtils.batchMoveToFolder(mContentResolver, mNotesListAdapter
-                            .getSelectedItemIds(), Notes.ID_TRASH_FOLER)) {
+                    if (!DataUtils.batchMoveToFolder(mContentResolver, selectedIds,
+                            Notes.ID_TRASH_FOLER)) {
                         Log.e(TAG, "Move notes to trash folder error, should not happens");
                     }
                 }
-                return widgets;
+                return selectedWidgets;
             }
 
             @Override
@@ -502,6 +514,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
                     }
                 }
                 mModeCallBack.finishActionMode();
+                startAsyncNotesListQuery();
             }
         }.execute();
     }
@@ -820,36 +833,80 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
 
     @Override
     public boolean onSearchRequested() {
-        startSearch(null, false, null /* appData */, false);
+        final EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setHint(R.string.search_hint);
+        new AlertDialog.Builder(this).setTitle(R.string.menu_search).setView(input)
+                .setNegativeButton(android.R.string.cancel, null)
+                .setPositiveButton(R.string.menu_search, (dialog, which) ->
+                        showSearchResults(input.getText().toString().trim()))
+                .show();
         return true;
     }
 
+    private void showSearchResults(final String query) {
+        if (TextUtils.isEmpty(query)) {
+            return;
+        }
+        Uri uri = Uri.parse("content://" + Notes.AUTHORITY + "/search").buildUpon()
+                .appendQueryParameter("pattern", query).build();
+        final ArrayList<Long> ids = new ArrayList<Long>();
+        final ArrayList<String> titles = new ArrayList<String>();
+        try (Cursor cursor = getContentResolver().query(uri, null, null, null, null)) {
+            if (cursor != null) {
+                int idColumn = cursor.getColumnIndexOrThrow(NoteColumns.ID);
+                int titleColumn = cursor.getColumnIndexOrThrow(
+                        SearchManager.SUGGEST_COLUMN_TEXT_1);
+                while (cursor.moveToNext() && ids.size() < 100) {
+                    ids.add(cursor.getLong(idColumn));
+                    titles.add(cursor.getString(titleColumn));
+                }
+            }
+        } catch (RuntimeException e) {
+            Log.e(TAG, "Search failed: " + e.getClass().getSimpleName());
+            Toast.makeText(this, R.string.search_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (ids.isEmpty()) {
+            Toast.makeText(this, R.string.search_no_results, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new AlertDialog.Builder(this).setTitle(R.string.menu_search)
+                .setItems(titles.toArray(new String[0]), (dialog, which) -> {
+                    Intent intent = new Intent(this, NoteEditActivity.class);
+                    intent.setAction(Intent.ACTION_VIEW);
+                    intent.putExtra(SearchManager.EXTRA_DATA_KEY, String.valueOf(ids.get(which)));
+                    intent.putExtra(SearchManager.USER_QUERY, query);
+                    startActivityForResult(intent, REQUEST_CODE_OPEN_NODE);
+                }).show();
+    }
+
     private void exportNoteToText() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TITLE, getString(R.string.file_name_txt_format,
+                android.text.format.DateFormat.format(getString(R.string.format_date_ymd),
+                        System.currentTimeMillis())));
+        startActivityForResult(intent, REQUEST_CODE_EXPORT_TEXT);
+    }
+
+    private void exportNoteToText(final Uri destination) {
         final BackupUtils backup = BackupUtils.getInstance(NotesListActivity.this);
         new AsyncTask<Void, Void, Integer>() {
 
             @Override
             protected Integer doInBackground(Void... unused) {
-                return backup.exportToText();
+                return backup.exportToText(destination);
             }
 
             @Override
             protected void onPostExecute(Integer result) {
-                if (result == BackupUtils.STATE_SD_CARD_UNMOUONTED) {
-                    AlertDialog.Builder builder = new AlertDialog.Builder(NotesListActivity.this);
-                    builder.setTitle(NotesListActivity.this
-                            .getString(R.string.failed_sdcard_export));
-                    builder.setMessage(NotesListActivity.this
-                            .getString(R.string.error_sdcard_unmounted));
-                    builder.setPositiveButton(android.R.string.ok, null);
-                    builder.show();
-                } else if (result == BackupUtils.STATE_SUCCESS) {
+                if (result == BackupUtils.STATE_SUCCESS) {
                     AlertDialog.Builder builder = new AlertDialog.Builder(NotesListActivity.this);
                     builder.setTitle(NotesListActivity.this
                             .getString(R.string.success_sdcard_export));
-                    builder.setMessage(NotesListActivity.this.getString(
-                            R.string.format_exported_file_location, backup
-                                    .getExportedTextFileName(), backup.getExportedTextFileDir()));
+                    builder.setMessage(R.string.exported_to_selected_file);
                     builder.setPositiveButton(android.R.string.ok, null);
                     builder.show();
                 } else if (result == BackupUtils.STATE_SYSTEM_ERROR) {

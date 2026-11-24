@@ -77,7 +77,8 @@
     <string name="format_move_notes_to_folder">Have moved selected %1$d notes to %2$s folder</string>
     <!-- Error information -->
     <string name="error_sdcard_unmounted">SD card busy, not available now</string>
-    <string name="error_sdcard_export">Export failed, please check SD card</string>
+    <string name="error_sdcard_export">Could not export to the selected file</string>
+    <string name="exported_to_selected_file">Notes were exported to the selected file.</string>
     <string name="error_note_not_exist">The note is not exist</string>
     <string name="error_note_empty_for_clock">Sorry, can not set clock on empty note</string>
     <string name="error_note_empty_for_send_to_desktop">Sorry, can not send and empty note to home</string>
@@ -117,11 +118,19 @@
     <string name="preferences_bg_random_appear_title">New note background color random</string>
 
     <string name="button_delete">Delete</string>
+    <string name="note_save">Save</string>
+    <string name="note_exit">Exit</string>
+    <string name="note_save_and_exit">Save and exit</string>
+    <string name="note_keep_editing">Keep editing</string>
+    <string name="note_unsaved_changes">This note has unsaved changes. Save before exiting?</string>
+    <string name="note_save_failed">Could not save the note</string>
     <string name="call_record_folder_name">Call notes</string>
     <string name="hint_foler_name">Input name</string>
 
     <string name="search_label">Searching Notes</string>
     <string name="search_hint">Search notes</string>
+    <string name="search_no_results">No matching notes</string>
+    <string name="search_failed">Search failed</string>
     <string name="search_setting_description">Text in your notes</string>
     <string name="search">Notes</string>
     <string name="datetime_dialog_ok">set</string>

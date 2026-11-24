@@ -196,7 +196,9 @@ public class WorkingNote {
                 }
             }
 
-            mNote.syncNote(mContext, mNoteId);
+            if (!mNote.syncNote(mContext, mNoteId)) {
+                return false;
+            }
 
             /**
              * Update widget content if there exist any widget of this note
@@ -216,8 +218,12 @@ public class WorkingNote {
         return mNoteId > 0;
     }
 
+    public boolean isBlankNewNote() {
+        return !existInDatabase() && (mContent == null || mContent.trim().length() == 0);
+    }
+
     private boolean isWorthSaving() {
-        if (mIsDeleted || (!existInDatabase() && TextUtils.isEmpty(mContent))
+        if (mIsDeleted || isBlankNewNote()
                 || (existInDatabase() && !mNote.isLocalModified())) {
             return false;
         } else {

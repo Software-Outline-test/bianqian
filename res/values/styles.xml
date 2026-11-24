@@ -58,6 +58,8 @@
         <item name="android:textColor">@color/secondary_text_dark</item>
     </style>
 
+    <style name="NoteListTheme" parent="@android:style/Theme.Holo.Light.NoActionBar" />
+
     <style name="NoteTheme" parent="@android:style/Theme.Holo.Light">
         <item name="android:actionBarStyle">@style/NoteActionBarStyle</item>
     </style>

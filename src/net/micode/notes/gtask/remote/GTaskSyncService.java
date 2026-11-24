@@ -33,6 +33,7 @@ public class GTaskSyncService extends Service {
     public final static int ACTION_INVALID = 2;
 
     public final static String GTASK_SERVICE_BROADCAST_NAME = "net.micode.notes.gtask.remote.gtask_sync_service";
+    public final static String SYNC_STATUS_PERMISSION = "net.micode.notes.permission.SYNC_STATUS";
 
     public final static String GTASK_SERVICE_BROADCAST_IS_SYNCING = "isSyncing";
 
@@ -69,6 +70,10 @@ public class GTaskSyncService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent == null) {
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
         Bundle bundle = intent.getExtras();
         if (bundle != null && bundle.containsKey(ACTION_STRING_NAME)) {
             switch (bundle.getInt(ACTION_STRING_NAME, ACTION_INVALID)) {
@@ -81,9 +86,10 @@ public class GTaskSyncService extends Service {
                 default:
                     break;
             }
-            return START_STICKY;
+            return START_NOT_STICKY;
         }
-        return super.onStartCommand(intent, flags, startId);
+        stopSelf(startId);
+        return START_NOT_STICKY;
     }
 
     @Override
@@ -100,9 +106,10 @@ public class GTaskSyncService extends Service {
     public void sendBroadcast(String msg) {
         mSyncProgress = msg;
         Intent intent = new Intent(GTASK_SERVICE_BROADCAST_NAME);
+        intent.setPackage(getPackageName());
         intent.putExtra(GTASK_SERVICE_BROADCAST_IS_SYNCING, mSyncTask != null);
         intent.putExtra(GTASK_SERVICE_BROADCAST_PROGRESS_MSG, msg);
-        sendBroadcast(intent);
+        sendBroadcast(intent, SYNC_STATUS_PERMISSION);
     }
 
     public static void startSync(Activity activity) {

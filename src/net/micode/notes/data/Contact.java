@@ -22,6 +22,7 @@ import android.provider.ContactsContract.CommonDataKinds.Phone;
 import android.provider.ContactsContract.Data;
 import android.telephony.PhoneNumberUtils;
 import android.util.Log;
+import net.micode.notes.tool.SafeLog;
 
 import java.util.HashMap;
 
@@ -60,13 +61,13 @@ public class Contact {
                 sContactCache.put(phoneNumber, name);
                 return name;
             } catch (IndexOutOfBoundsException e) {
-                Log.e(TAG, " Cursor get string error " + e.toString());
+                SafeLog.error(TAG, "Contact lookup failed", e);
                 return null;
             } finally {
                 cursor.close();
             }
         } else {
-            Log.d(TAG, "No contact matched with number:" + phoneNumber);
+            Log.d(TAG, "No contact matched");
             return null;
         }
     }

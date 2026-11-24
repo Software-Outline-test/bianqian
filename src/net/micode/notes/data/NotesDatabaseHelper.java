@@ -18,6 +18,7 @@ package net.micode.notes.data;
 
 import android.content.ContentValues;
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
@@ -243,7 +244,7 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
          */
         values.put(NoteColumns.ID, Notes.ID_CALL_RECORD_FOLDER);
         values.put(NoteColumns.TYPE, Notes.TYPE_SYSTEM);
-        db.insert(TABLE.NOTE, null, values);
+        db.insertWithOnConflict(TABLE.NOTE, null, values, SQLiteDatabase.CONFLICT_IGNORE);
 
         /**
          * root folder which is default folder
@@ -251,7 +252,7 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
         values.clear();
         values.put(NoteColumns.ID, Notes.ID_ROOT_FOLDER);
         values.put(NoteColumns.TYPE, Notes.TYPE_SYSTEM);
-        db.insert(TABLE.NOTE, null, values);
+        db.insertWithOnConflict(TABLE.NOTE, null, values, SQLiteDatabase.CONFLICT_IGNORE);
 
         /**
          * temporary folder which is used for moving note
@@ -259,7 +260,7 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
         values.clear();
         values.put(NoteColumns.ID, Notes.ID_TEMPARAY_FOLDER);
         values.put(NoteColumns.TYPE, Notes.TYPE_SYSTEM);
-        db.insert(TABLE.NOTE, null, values);
+        db.insertWithOnConflict(TABLE.NOTE, null, values, SQLiteDatabase.CONFLICT_IGNORE);
 
         /**
          * create trash folder
@@ -267,7 +268,7 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
         values.clear();
         values.put(NoteColumns.ID, Notes.ID_TRASH_FOLER);
         values.put(NoteColumns.TYPE, Notes.TYPE_SYSTEM);
-        db.insert(TABLE.NOTE, null, values);
+        db.insertWithOnConflict(TABLE.NOTE, null, values, SQLiteDatabase.CONFLICT_IGNORE);
     }
 
     public void createDataTable(SQLiteDatabase db) {
@@ -302,42 +303,60 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        boolean reCreateTriggers = false;
-        boolean skipV2 = false;
-
-        if (oldVersion == 1) {
-            upgradeToV2(db);
-            skipV2 = true; // this upgrade including the upgrade from v2 to v3
-            oldVersion++;
+        for (int version = oldVersion; version < newVersion; version++) {
+            switch (version) {
+                case 1:
+                    upgradeToV2(db);
+                    break;
+                case 2:
+                    upgradeToV3(db);
+                    break;
+                case 3:
+                    upgradeToV4(db);
+                    break;
+                default:
+                    throw new IllegalStateException("Unsupported notes database version " + version);
+            }
         }
-
-        if (oldVersion == 2 && !skipV2) {
-            upgradeToV3(db);
-            reCreateTriggers = true;
-            oldVersion++;
-        }
-
-        if (oldVersion == 3) {
-            upgradeToV4(db);
-            oldVersion++;
-        }
-
-        if (reCreateTriggers) {
-            reCreateNoteTableTriggers(db);
-            reCreateDataTableTriggers(db);
-        }
-
-        if (oldVersion != newVersion) {
-            throw new IllegalStateException("Upgrade notes database to version " + newVersion
-                    + "fails");
-        }
+        reCreateNoteTableTriggers(db);
+        reCreateDataTableTriggers(db);
+        db.execSQL(CREATE_DATA_NOTE_ID_INDEX_SQL);
     }
 
     private void upgradeToV2(SQLiteDatabase db) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE.NOTE);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE.DATA);
-        createNoteTable(db);
-        createDataTable(db);
+        if (!hasTable(db, TABLE.NOTE)) {
+            createNoteTable(db);
+        } else {
+            ensureColumn(db, TABLE.NOTE, NoteColumns.PARENT_ID, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.ALERTED_DATE, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.BG_COLOR_ID, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.CREATED_DATE, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.HAS_ATTACHMENT, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.MODIFIED_DATE, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.NOTES_COUNT, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.SNIPPET, "TEXT NOT NULL DEFAULT ''");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.TYPE, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.WIDGET_ID, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.WIDGET_TYPE, "INTEGER NOT NULL DEFAULT -1");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.SYNC_ID, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.LOCAL_MODIFIED, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.NOTE, NoteColumns.ORIGIN_PARENT_ID, "INTEGER NOT NULL DEFAULT 0");
+            createSystemFolder(db);
+        }
+        if (!hasTable(db, TABLE.DATA)) {
+            createDataTable(db);
+        } else {
+            ensureColumn(db, TABLE.DATA, DataColumns.MIME_TYPE, "TEXT NOT NULL DEFAULT ''");
+            ensureColumn(db, TABLE.DATA, DataColumns.NOTE_ID, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.DATA, NoteColumns.CREATED_DATE, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.DATA, NoteColumns.MODIFIED_DATE, "INTEGER NOT NULL DEFAULT 0");
+            ensureColumn(db, TABLE.DATA, DataColumns.CONTENT, "TEXT NOT NULL DEFAULT ''");
+            ensureColumn(db, TABLE.DATA, DataColumns.DATA1, "INTEGER");
+            ensureColumn(db, TABLE.DATA, DataColumns.DATA2, "INTEGER");
+            ensureColumn(db, TABLE.DATA, DataColumns.DATA3, "TEXT NOT NULL DEFAULT ''");
+            ensureColumn(db, TABLE.DATA, DataColumns.DATA4, "TEXT NOT NULL DEFAULT ''");
+            ensureColumn(db, TABLE.DATA, DataColumns.DATA5, "TEXT NOT NULL DEFAULT ''");
+        }
     }
 
     private void upgradeToV3(SQLiteDatabase db) {
@@ -346,17 +365,39 @@ public class NotesDatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("DROP TRIGGER IF EXISTS update_note_modified_date_on_delete");
         db.execSQL("DROP TRIGGER IF EXISTS update_note_modified_date_on_update");
         // add a column for gtask id
-        db.execSQL("ALTER TABLE " + TABLE.NOTE + " ADD COLUMN " + NoteColumns.GTASK_ID
-                + " TEXT NOT NULL DEFAULT ''");
+        ensureColumn(db, TABLE.NOTE, NoteColumns.GTASK_ID, "TEXT NOT NULL DEFAULT ''");
         // add a trash system folder
         ContentValues values = new ContentValues();
         values.put(NoteColumns.ID, Notes.ID_TRASH_FOLER);
         values.put(NoteColumns.TYPE, Notes.TYPE_SYSTEM);
-        db.insert(TABLE.NOTE, null, values);
+        db.insertWithOnConflict(TABLE.NOTE, null, values, SQLiteDatabase.CONFLICT_IGNORE);
     }
 
     private void upgradeToV4(SQLiteDatabase db) {
-        db.execSQL("ALTER TABLE " + TABLE.NOTE + " ADD COLUMN " + NoteColumns.VERSION
-                + " INTEGER NOT NULL DEFAULT 0");
+        ensureColumn(db, TABLE.NOTE, NoteColumns.VERSION, "INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private boolean hasTable(SQLiteDatabase db, String table) {
+        Cursor cursor = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                new String[] { table });
+        try {
+            return cursor.moveToFirst();
+        } finally {
+            cursor.close();
+        }
+    }
+
+    private void ensureColumn(SQLiteDatabase db, String table, String column, String definition) {
+        Cursor cursor = db.rawQuery("PRAGMA table_info(" + table + ")", null);
+        try {
+            while (cursor.moveToNext()) {
+                if (column.equalsIgnoreCase(cursor.getString(1))) {
+                    return;
+                }
+            }
+        } finally {
+            cursor.close();
+        }
+        db.execSQL("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
     }
 }
