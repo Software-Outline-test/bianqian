@@ -144,6 +144,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.note_list);
+        DropdownMenu.bindOptionsButton(this);
         initResources();
 
         /**
@@ -246,6 +247,7 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
         private MenuItem mMoveMenu;
 
         public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+            findViewById(R.id.more_options).setVisibility(View.GONE);
             getMenuInflater().inflate(R.menu.note_list_options, menu);
             menu.findItem(R.id.delete).setOnMenuItemClickListener(this);
             mMoveMenu = menu.findItem(R.id.move);

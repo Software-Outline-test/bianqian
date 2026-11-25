@@ -132,4 +132,5 @@
         <item quantity="other"><xliff:g id="NUMBER">%1$s</xliff:g> 条符合“<xliff:g id="SEARCH">%2$s</xliff:g>”的搜索结果</item>
     </plurals>
 
+    <string name="more_options">更多选项</string>
 </resources>

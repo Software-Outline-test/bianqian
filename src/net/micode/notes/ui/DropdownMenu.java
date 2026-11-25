@@ -16,6 +16,7 @@
 
 package net.micode.notes.ui;
 
+import android.app.Activity;
 import android.content.Context;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -42,6 +43,15 @@ public class DropdownMenu {
             public void onClick(View v) {
                 mPopupMenu.show();
             }
+        });
+    }
+
+    static void bindOptionsButton(Activity activity) {
+        activity.findViewById(R.id.more_options).setOnClickListener(anchor -> {
+            PopupMenu popup = new PopupMenu(activity, anchor);
+            activity.onPrepareOptionsMenu(popup.getMenu());
+            popup.setOnMenuItemClickListener(activity::onOptionsItemSelected);
+            popup.show();
         });
     }
 

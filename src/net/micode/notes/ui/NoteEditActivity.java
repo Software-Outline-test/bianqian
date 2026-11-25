@@ -154,6 +154,7 @@ public class NoteEditActivity extends Activity implements OnClickListener,
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         this.setContentView(R.layout.note_edit);
+        DropdownMenu.bindOptionsButton(this);
 
         if (savedInstanceState == null && !initActivityState(getIntent())) {
             finish();

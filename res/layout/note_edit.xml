@@ -56,6 +56,19 @@
                 android:layout_marginRight="8dip"
                 android:textAppearance="@style/TextAppearanceSecondaryItem" />
 
+            <Button
+                android:id="@+id/more_options"
+                android:layout_marginRight="32dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center_vertical"
+                android:background="?android:attr/selectableItemBackground"
+                android:contentDescription="@string/more_options"
+                android:padding="0dp"
+                android:text="&#8942;"
+                android:textColor="#432F20"
+                android:textSize="28sp" />
+
             <ImageButton
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
