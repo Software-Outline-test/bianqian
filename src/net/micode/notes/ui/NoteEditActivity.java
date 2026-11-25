@@ -27,7 +27,13 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.graphics.drawable.Icon;
 import android.graphics.Paint;
+import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.text.Spannable;
@@ -67,6 +73,7 @@ import net.micode.notes.widget.NoteWidgetProvider_4x;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Collections;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -867,43 +874,110 @@ public class NoteEditActivity extends Activity implements OnClickListener,
     }
 
     private void sendToDesktop() {
-        /**
-         * Before send message to home, we should make sure that current
-         * editing note is exists in databases. So, for new note, firstly
-         * save it
-         */
-        if (!mWorkingNote.existInDatabase()) {
-            saveNote();
+        getWorkingText();
+        String content = mWorkingNote.getContent();
+        if (TextUtils.isEmpty(content) || content.trim().length() == 0) {
+            showToast(R.string.error_note_empty_for_send_to_desktop);
+            return;
+        }
+        if (!saveNoteOrShowError()) {
+            return;
         }
 
-        if (mWorkingNote.getNoteId() > 0) {
-            Intent sender = new Intent();
-            Intent shortcutIntent = new Intent(this, NoteEditActivity.class);
-            shortcutIntent.setAction(Intent.ACTION_VIEW);
-            shortcutIntent.putExtra(Intent.EXTRA_UID, mWorkingNote.getNoteId());
-            sender.putExtra(Intent.EXTRA_SHORTCUT_INTENT, shortcutIntent);
-            sender.putExtra(Intent.EXTRA_SHORTCUT_NAME,
-                    makeShortcutIconTitle(mWorkingNote.getContent()));
-            sender.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE,
-                    Intent.ShortcutIconResource.fromContext(this, R.drawable.icon_app));
-            sender.putExtra("duplicate", true);
-            sender.setAction("com.android.launcher.action.INSTALL_SHORTCUT");
-            showToast(R.string.info_note_enter_desktop);
-            sendBroadcast(sender);
-        } else {
-            /**
-             * There is the condition that user has input nothing (the note is
-             * not worthy saving), we have no note id, remind the user that he
-             * should input something
-             */
-            Log.e(TAG, "Send to desktop error");
-            showToast(R.string.error_note_empty_for_send_to_desktop);
+        long noteId = mWorkingNote.getNoteId();
+        if (noteId <= 0) {
+            showToast(R.string.note_save_failed);
+            return;
         }
+        Intent shortcutIntent = new Intent(this, NotesListActivity.class);
+        shortcutIntent.setAction(NotesListActivity.ACTION_OPEN_NOTE_SHORTCUT);
+        shortcutIntent.setData(ContentUris.withAppendedId(Notes.CONTENT_NOTE_URI, noteId));
+        shortcutIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        String title = makeShortcutIconTitle(content);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            ShortcutManager manager = getSystemService(ShortcutManager.class);
+            if (manager != null) {
+                ShortcutInfo shortcut = new ShortcutInfo.Builder(this, "note-" + noteId)
+                        .setShortLabel(title)
+                        .setIcon(Icon.createWithResource(this, R.drawable.icon_app))
+                        .setIntent(shortcutIntent)
+                        .build();
+                if (!manager.isRequestPinShortcutSupported()) {
+                    new Thread(() -> {
+                        boolean published = false;
+                        try {
+                            published = manager.addDynamicShortcuts(
+                                    Collections.singletonList(shortcut));
+                        } catch (RuntimeException e) {
+                            Log.e(TAG, "Shortcut publish failed: "
+                                    + e.getClass().getSimpleName());
+                        }
+                        final boolean available = published;
+                        runOnUiThread(() -> showUnsupportedShortcutDialog(available));
+                    }).start();
+                    return;
+                }
+                new Thread(() -> {
+                    try {
+                        boolean requested = manager.requestPinShortcut(shortcut, null);
+                        runOnUiThread(() -> {
+                            if (requested) {
+                                showToast(R.string.info_shortcut_requested);
+                            } else {
+                                showUnsupportedShortcutDialog(false);
+                            }
+                        });
+                    } catch (RuntimeException e) {
+                        Log.e(TAG, "Shortcut request failed: " + e.getClass().getSimpleName());
+                        runOnUiThread(() -> showToast(R.string.error_shortcut_failed));
+                    }
+                }).start();
+                return;
+            }
+            showUnsupportedShortcutDialog(false);
+            return;
+        }
+        showToast(sendLegacyShortcut(shortcutIntent, title)
+                ? R.string.info_shortcut_requested : R.string.error_shortcut_unsupported);
+    }
+
+    private void showUnsupportedShortcutDialog(boolean manualShortcutAvailable) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.error_shortcut_unsupported)
+                .setMessage(manualShortcutAvailable ? R.string.shortcut_manual_alternative
+                        : R.string.shortcut_widget_alternative)
+                .setPositiveButton(android.R.string.ok, null)
+                .show();
+    }
+
+    private boolean sendLegacyShortcut(Intent shortcutIntent, String title) {
+        Intent home = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME);
+        ResolveInfo launcher = getPackageManager().resolveActivity(home,
+                PackageManager.MATCH_DEFAULT_ONLY);
+        if (launcher == null || launcher.activityInfo == null) {
+            return false;
+        }
+        Intent sender = new Intent("com.android.launcher.action.INSTALL_SHORTCUT");
+        sender.setPackage(launcher.activityInfo.packageName);
+        if (getPackageManager().queryBroadcastReceivers(sender, 0).isEmpty()) {
+            return false;
+        }
+        sender.putExtra(Intent.EXTRA_SHORTCUT_INTENT, shortcutIntent);
+        sender.putExtra(Intent.EXTRA_SHORTCUT_NAME, title);
+        sender.putExtra(Intent.EXTRA_SHORTCUT_ICON_RESOURCE,
+                Intent.ShortcutIconResource.fromContext(this, R.drawable.icon_app));
+        sender.putExtra("duplicate", false);
+        sendBroadcast(sender);
+        return true;
     }
 
     private String makeShortcutIconTitle(String content) {
-        content = content.replace(TAG_CHECKED, "");
-        content = content.replace(TAG_UNCHECKED, "");
+        content = content.replace(TAG_CHECKED, "").replace(TAG_UNCHECKED, "")
+                .replace('\n', ' ').trim();
+        if (content.length() == 0) {
+            return getString(R.string.app_name);
+        }
         return content.length() > SHORTCUT_ICON_TITLE_MAX_LEN ? content.substring(0,
                 SHORTCUT_ICON_TITLE_MAX_LEN) : content;
     }

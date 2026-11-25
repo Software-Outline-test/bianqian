@@ -72,6 +72,11 @@
     <string name="menu_title_select_folder">选择文件夹</string>
     <string name="menu_move_parent_folder">上一级文件夹</string>
     <string name="info_note_enter_desktop">已添加到桌面</string>
+    <string name="info_shortcut_requested">已向桌面发送添加请求</string>
+    <string name="error_shortcut_unsupported">当前桌面无法自动固定便签快捷方式</string>
+    <string name="error_shortcut_failed">无法请求添加桌面快捷方式</string>
+    <string name="shortcut_widget_alternative">如需将便签放到当前桌面，请长按桌面空白处，选择“小组件”，再添加“便签”小组件。</string>
+    <string name="shortcut_manual_alternative">已将该便签加入应用快捷方式。请长按“便签”应用图标，将这条便签拖到桌面。如果桌面没有显示快捷方式，也可以长按桌面空白处添加“便签”小组件。</string>
     <string name="alert_title_delete">删除</string>
     <string name="alert_message_delete_notes">确认要删除所选的 %d 条便签吗?</string>
     <string name="alert_message_delete_note">确认要删除该条便签吗?</string>

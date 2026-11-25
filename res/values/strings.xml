@@ -70,6 +70,11 @@
     <string name="menu_title_select_folder">Select folder</string>
     <string name="menu_move_parent_folder">Parent folder</string>
     <string name="info_note_enter_desktop">Note added to home</string>
+    <string name="info_shortcut_requested">Shortcut request sent to the home screen</string>
+    <string name="error_shortcut_unsupported">This home screen cannot pin a note automatically</string>
+    <string name="error_shortcut_failed">Could not request a home screen shortcut</string>
+    <string name="shortcut_widget_alternative">To keep a note on this home screen, touch and hold an empty area, choose Widgets, then add a Notes widget.</string>
+    <string name="shortcut_manual_alternative">The note is available as an app shortcut. Touch and hold the Notes app icon, then drag this note to the home screen. If your launcher does not show it, add a Notes widget from the home screen instead.</string>
     <string name="alert_message_delete_folder">Confirm to delete folder and its notes?</string>
     <string name="alert_title_delete">Delete selected notes</string>
     <string name="alert_message_delete_notes">Confirm to delete the selected %d notes?</string>

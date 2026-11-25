@@ -67,6 +67,11 @@
     <string name="menu_title_select_folder">選擇文件夾</string>
     <string name="menu_move_parent_folder">上一級文件夾</string>
     <string name="info_note_enter_desktop">已添加到桌面</string>
+    <string name="info_shortcut_requested">已向桌面傳送新增請求</string>
+    <string name="error_shortcut_unsupported">目前桌面無法自動固定便籤捷徑</string>
+    <string name="error_shortcut_failed">無法請求新增桌面捷徑</string>
+    <string name="shortcut_widget_alternative">如需將便籤放到目前桌面，請長按桌面空白處，選擇「小工具」，再新增「便籤」小工具。</string>
+    <string name="shortcut_manual_alternative">已將這條便籤加入應用程式捷徑。請長按「便籤」應用程式圖示，將這條便籤拖到桌面。如果桌面沒有顯示捷徑，也可以長按桌面空白處新增「便籤」小工具。</string>
     <string name="alert_title_delete">刪除</string>
     <string name="alert_message_delete_notes">确认要刪除所選的 %d 條便籤嗎?</string>
     <string name="alert_message_delete_note">确认要删除該條便籤嗎?</string>

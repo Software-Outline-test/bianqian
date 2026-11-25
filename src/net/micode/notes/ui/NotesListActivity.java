@@ -23,6 +23,7 @@ import android.app.SearchManager;
 import android.appwidget.AppWidgetManager;
 import android.content.AsyncQueryHandler;
 import android.content.ContentResolver;
+import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -83,6 +84,8 @@ import java.util.HashSet;
 import java.util.ArrayList;
 
 public class NotesListActivity extends Activity implements OnClickListener, OnItemLongClickListener {
+    public static final String ACTION_OPEN_NOTE_SHORTCUT =
+            "net.micode.notes.action.OPEN_NOTE_SHORTCUT";
     private static final int FOLDER_NOTE_LIST_QUERY_TOKEN = 0;
 
     private static final int FOLDER_LIST_QUERY_TOKEN      = 1;
@@ -151,6 +154,45 @@ public class NotesListActivity extends Activity implements OnClickListener, OnIt
          * Insert an introduction when user firstly use this application
          */
         setAppInfoFromRawRes();
+        if (savedInstanceState == null) {
+            openNoteFromShortcut(getIntent());
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        openNoteFromShortcut(intent);
+    }
+
+    private void openNoteFromShortcut(Intent intent) {
+        if (intent == null || !ACTION_OPEN_NOTE_SHORTCUT.equals(intent.getAction())) {
+            return;
+        }
+        intent.setAction(Intent.ACTION_MAIN);
+        Uri uri = intent.getData();
+        if (uri == null || !"content".equals(uri.getScheme())
+                || !Notes.AUTHORITY.equals(uri.getAuthority())
+                || uri.getPathSegments().size() != 2
+                || !"note".equals(uri.getPathSegments().get(0))) {
+            return;
+        }
+        long noteId;
+        try {
+            noteId = ContentUris.parseId(uri);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (noteId <= 0 || !DataUtils.visibleInNoteDatabase(getContentResolver(), noteId,
+                Notes.TYPE_NOTE)) {
+            Toast.makeText(this, R.string.error_note_not_exist, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent edit = new Intent(this, NoteEditActivity.class);
+        edit.setAction(Intent.ACTION_VIEW);
+        edit.putExtra(Intent.EXTRA_UID, noteId);
+        startActivityForResult(edit, REQUEST_CODE_OPEN_NODE);
     }
 
     @Override
